@@ -10,41 +10,61 @@ const pool = new Pool({
   port: 5432
 });
 
-const auth = async (req, res, next) => {
-  const rawToken = req.header("Authorization");
-  console.log("token" + rawToken);
-  const Token = rawToken.replace("Bearer ", "");
-  const id = jwt.verify(Token, "daragon");
-  console.log(id);
-  // console.log(Token);
-  const query = "SELECT * FROM employee_info WHERE id = $1";
-  try {
-    const employee = await pool.query(query, [id.userId]);
-    console.log(employee.rows);
-    if (employee.rowCount === 0) {
-      throw new Error();
+function HasRolex(role) {
+  const auth = async (req, res, next) => {
+    const rawToken = req.header("Authorization");
+    console.log("token" + rawToken);
+    const Token = rawToken.replace("Bearer ", "");
+    const data = jwt.verify(Token, "daragon");
+    console.log(data);
+    // console.log(Token);
+    // const query = "SELECT * FROM employee_info WHERE id = $1";
+    // try {
+    //   const employee = await pool.query(query, [data.id]);
+    //   console.log(employee.rows);
+    //   if (employee.rowCount === 0) {
+    //     throw new Error();
+    //   }
+    //   next();
+    // } catch (error) {
+    //   res.status(400).send({ message: `Unauthorized Access ${error}` });
+    // }
+    // res.status(200).send({ role: data.role });
+    console.log(data.role);
+  };
+}
+
+function HasRole(role) {
+  return function(req, res, next) {
+    const rawToken = req.header("Authorization");
+
+    const Token = rawToken.replace("Bearer ", "");
+    const data = jwt.verify(Token, "daragon");
+
+    if (role.includes(String(data.role.trim()))) {
+      next();
+    } else {
+      res.status(500).send({ message: "Access Denied" });
     }
-    next();
-  } catch (error) {
-    res.status(400).send({ message: `Unauthorized Access ${error}` });
-  }
-};
+  };
+}
+
 // comparing password entered by user vs hash password
 const comparePassword = (password, hashPassword) =>
   bcrypt.compareSync(password, hashPassword);
 
 // generating authentication tokens
-const generateToken = id => {
-  const token = jwt.sign({ userId: id }, "daragon");
+const generateToken = (id, role) => {
+  console.log({ id, role });
+  const token = jwt.sign({ id, role }, "daragon");
   return token;
 };
 
 const getEmployees = async (req, res) => {
-  const query = "SELECT * FROM employee_data";
+  const query = "SELECT * FROM employee_data ORDER BY name ASC";
   try {
     const results = await pool.query(query);
-    const { rows } = results;
-    res.status(200).send({ rows });
+    res.status(200).json(results.rows);
   } catch (error) {
     res.status(500).send(error);
     console.log(error);
@@ -53,12 +73,11 @@ const getEmployees = async (req, res) => {
 
 const getEmployeeById = async (req, res) => {
   const id = parseInt(req.params.id, 10);
-  const query = "SELECT * FROM employee_info WHERE id = $1";
+  const query = "SELECT * FROM employee_data WHERE id = $1";
   try {
     const results = await pool.query(query, [id]);
     const { rows } = results;
-    console.log(rows);
-    res.status(200).send({ rows });
+    res.status(200).json(rows);
   } catch (error) {
     res.status(500).send(error);
     console.log(error);
@@ -69,21 +88,21 @@ const createEmployee = async (req, res) => {
   const { name, email, age, password, roles } = req.body;
   console.log(req.body);
   const query =
-    "INSERT INTO employee_data (name, email, age, password,roles) VALUES ($1, $2, $3, $4, $5)";
+    "INSERT INTO employee_data (name, email, age, password, roles) VALUES ($1, $2, $3, $4, $5)";
   // hash my password before saving into the data
-  //const encrypted = bcrypt.hashSync(password, bcrypt.genSaltSync(8));
+
   // generate token for this particular user
-  //
-  //
+
   try {
+    const encrypted = await bcrypt.hashSync(password, bcrypt.genSaltSync(8));
     const results = await pool.query(query, [
       name,
       email,
       age,
-      password,
+      encrypted,
       roles
     ]);
-    res.status(201).send(`User added with id ${results.insertId}`);
+    res.status(201).send(`User added with id ${results}`);
   } catch (error) {
     res.status(400).send(error);
     console.log(error);
@@ -121,7 +140,7 @@ const deleteEmployee = async (req, res) => {
 // login an existing user
 const employeeLogin = async (req, res) => {
   const { email, password } = req.body;
-  const query = "SELECT * FROM employee_info WHERE email=$1";
+  const query = "SELECT * FROM employee_data WHERE email=$1";
   try {
     // check for email
     const results = await pool.query(query, [email]);
@@ -134,8 +153,7 @@ const employeeLogin = async (req, res) => {
     if (!isPasswordValid) {
       throw new Error("Sorry,,you entered wrong password..");
     }
-
-    const token = generateToken(results.rows[0].id);
+    const token = generateToken(results.rows[0].email, results.rows[0].roles);
     res.status(200).send(token);
   } catch (error) {
     res.status(400).send(error);
@@ -150,5 +168,5 @@ module.exports = {
   updateEmployee,
   deleteEmployee,
   employeeLogin,
-  auth
+  HasRole
 };
