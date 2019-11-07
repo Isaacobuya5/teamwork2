@@ -3,7 +3,7 @@ const db = require("../database/queries");
 
 const router = new express.Router();
 
-router.get("/employees", db.auth, db.getEmployees);
+router.get("/employees", db.getEmployees);
 router.get("/employees/:id", db.getEmployeeById);
 router.post("/employees", db.createEmployee);
 router.post("/employee/login", db.employeeLogin);

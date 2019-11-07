@@ -40,10 +40,11 @@ const generateToken = id => {
 };
 
 const getEmployees = async (req, res) => {
-  const query = "SELECT * FROM employee_info ORDER BY name ASC";
+  const query = "SELECT * FROM employee_data";
   try {
     const results = await pool.query(query);
-    res.status(200).json(results.rows);
+    const { rows } = results;
+    res.status(200).send({ rows });
   } catch (error) {
     res.status(500).send(error);
     console.log(error);
@@ -56,7 +57,8 @@ const getEmployeeById = async (req, res) => {
   try {
     const results = await pool.query(query, [id]);
     const { rows } = results;
-    res.status(200).json(rows);
+    console.log(rows);
+    res.status(200).send({ rows });
   } catch (error) {
     res.status(500).send(error);
     console.log(error);
@@ -64,16 +66,23 @@ const getEmployeeById = async (req, res) => {
 };
 // create a new employee
 const createEmployee = async (req, res) => {
-  const { name, email, age, password } = req.body;
+  const { name, email, age, password, roles } = req.body;
+  console.log(req.body);
   const query =
-    "INSERT INTO employee_info (name, email, age, password) VALUES ($1, $2, $3, $4)";
+    "INSERT INTO employee_data (name, email, age, password,roles) VALUES ($1, $2, $3, $4, $5)";
   // hash my password before saving into the data
-  const encrypted = bcrypt.hashSync(password, bcrypt.genSaltSync(8));
+  //const encrypted = bcrypt.hashSync(password, bcrypt.genSaltSync(8));
   // generate token for this particular user
-  const token = generateToken(req.params._id);
-  console.log(token);
+  //
+  //
   try {
-    const results = await pool.query(query, [name, email, age, encrypted]);
+    const results = await pool.query(query, [
+      name,
+      email,
+      age,
+      password,
+      roles
+    ]);
     res.status(201).send(`User added with id ${results.insertId}`);
   } catch (error) {
     res.status(400).send(error);
